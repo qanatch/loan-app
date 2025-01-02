@@ -1,5 +1,6 @@
 import {test, expect} from '@playwright/test';
-//https://backend.tallinn-learning.ee/api/loan-calc?amount=1561&period=12
+import {Simulate} from "react-dom/test-utils";
+import error = Simulate.error;
 
 const routeToMock = '**/api/loan-calc?amount=*&period=*'
 
@@ -41,4 +42,65 @@ test('open and verify bad request-400)', async ({page}) => {
         .textContent();
 
     expect(errorText).toBe('Oops, something went wrong');
+});
+
+
+test('test with mock - code 500 and empty body', async ({page}) => {
+    await page.route(routeToMock, async (route) => {
+        await route.fulfill({
+            status: 500
+        });
+    });
+
+    const responsePromise = page.waitForResponse(routeToMock);
+    await page.goto('http://localhost:3000/small-loan');
+    await responsePromise
+
+    const errorText = await page
+        .getByTestId('id-small-loan-calculator-field-error')
+        .textContent();
+
+    expect(errorText).toBe('Oops, something went wrong');
+});
+
+test('test with mock - code 200 and empty body', async ({page}) => {
+    await page.route(routeToMock, async (route) => {
+        await route.fulfill({
+            status: 200,
+            //body: ''
+        });
+    });
+
+    const responsePromise = page.waitForResponse(routeToMock);
+    await page.goto('http://localhost:3000/small-loan');
+    await responsePromise
+
+    const amountText = await page
+        .getByTestId('ib-small-loan-calculator-field-monthlyPayment')
+        .textContent();
+
+    expect(amountText).toBe('undefined €');
+});
+
+test('test with mock - code 500 and incorrect key', async ({page}) => {
+    const mockValue = 11.51
+
+    await page.route(routeToMock, async (route) => {
+        const mockResponse = {incorrectKey: mockValue,};
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockResponse),
+        });
+    })
+
+    const responsePromise = page.waitForResponse(routeToMock);
+    await page.goto('http://localhost:3000/small-loan');
+    await responsePromise
+
+    const amountText = await page
+        .getByTestId('ib-small-loan-calculator-field-monthlyPayment')
+        .textContent();
+
+    expect(amountText).toBe('undefined €');
 });
